@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="Addons" oor:package="org.openoffice.Office">
+  <node oor:name="AddonUI">
+
+    <!-- Menu: Tools > Add-Ons > Presentation Pace Tracker -->
+    <node oor:name="AddonMenu">
+      <node oor:name="jp.atmitani.impress.pacetracker.menu" oor:op="replace">
+        <prop oor:name="Title" oor:type="xs:string">
+          <value xml:lang="en-US">Presentation Pace Tracker</value>
+          <value xml:lang="ja">発表ペーストラッカー</value>
+        </prop>
+        <prop oor:name="Context" oor:type="xs:string">
+          <value>com.sun.star.presentation.PresentationDocument</value>
+        </prop>
+        <node oor:name="Submenu">
+          <node oor:name="m1" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+              <value>service:jp.atmitani.impress.pacetracker.PaceTracker?open</value>
+            </prop>
+            <prop oor:name="Title" oor:type="xs:string">
+              <value xml:lang="en-US">Settings...</value>
+              <value xml:lang="ja">管理画面を開く...</value>
+            </prop>
+            <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
+            <prop oor:name="Context" oor:type="xs:string">
+              <value>com.sun.star.presentation.PresentationDocument</value>
+            </prop>
+          </node>
+          <node oor:name="m2" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+              <value>service:jp.atmitani.impress.pacetracker.PaceTracker?start</value>
+            </prop>
+            <prop oor:name="Title" oor:type="xs:string">
+              <value xml:lang="en-US">Start</value>
+              <value xml:lang="ja">計測を開始</value>
+            </prop>
+            <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
+            <prop oor:name="Context" oor:type="xs:string">
+              <value>com.sun.star.presentation.PresentationDocument</value>
+            </prop>
+          </node>
+          <node oor:name="m3" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+              <value>service:jp.atmitani.impress.pacetracker.PaceTracker?reset</value>
+            </prop>
+            <prop oor:name="Title" oor:type="xs:string">
+              <value xml:lang="en-US">Reset</value>
+              <value xml:lang="ja">リセット</value>
+            </prop>
+            <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
+            <prop oor:name="Context" oor:type="xs:string">
+              <value>com.sun.star.presentation.PresentationDocument</value>
+            </prop>
+          </node>
+        </node>
+      </node>
+    </node>
+
+    <!-- Toolbar: View > Toolbars > Add-on toolbar -->
+    <node oor:name="OfficeToolBar">
+      <node oor:name="jp.atmitani.impress.pacetracker.toolbar" oor:op="replace">
+        <node oor:name="b1" oor:op="replace">
+          <prop oor:name="URL" oor:type="xs:string">
+            <value>service:jp.atmitani.impress.pacetracker.PaceTracker?open</value>
+          </prop>
+          <prop oor:name="Title" oor:type="xs:string">
+            <value xml:lang="en-US">Presentation Pace Tracker</value>
+            <value xml:lang="ja">発表ペーストラッカー</value>
+          </prop>
+          <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
+          <prop oor:name="Context" oor:type="xs:string">
+            <value>com.sun.star.presentation.PresentationDocument</value>
+          </prop>
+        </node>
+      </node>
+    </node>
+
+    <node oor:name="Images">
+      <node oor:name="jp.atmitani.impress.pacetracker.image" oor:op="replace">
+        <prop oor:name="URL" oor:type="xs:string">
+          <value>service:jp.atmitani.impress.pacetracker.PaceTracker?open</value>
+        </prop>
+        <node oor:name="UserDefinedImages">
+          <prop oor:name="ImageSmallURL" oor:type="xs:string">
+            <value>%origin%/icons/toolbar_16.png</value>
+          </prop>
+          <prop oor:name="ImageBigURL" oor:type="xs:string">
+            <value>%origin%/icons/toolbar_26.png</value>
+          </prop>
+        </node>
+      </node>
+    </node>
+
+  </node>
+</oor:component-data>

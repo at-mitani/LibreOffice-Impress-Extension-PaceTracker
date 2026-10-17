@@ -1,0 +1,1 @@
+Shows a progress band at the bottom of the running slide show: a turtle icon moves with the elapsed time and a rabbit icon moves with the slide progress, from a start flag to a goal flag, so you can see at a glance whether you will finish on time. Set the planned duration, start/reset the measurement and upload your own icons from Tools > Add-Ons > Presentation Pace Tracker.
