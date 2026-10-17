@@ -26,7 +26,7 @@ A LibreOffice Impress extension that shows a progress band at the bottom of the 
 | Topic | English | 日本語 |
 |---|---|---|
 | Installation and usage | [INSTALL_en.md](docs/INSTALL_en.md) | [INSTALL_ja.md](docs/INSTALL_ja.md) |
-| Publishing on extensions.libreoffice.org | [PUBLISH_en.md](docs/PUBLISH_en.md) | [PUBLISH_ja.md](docs/PUBLISH_ja.md) |
+
 
 ## Folder layout
 

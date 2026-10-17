@@ -26,7 +26,6 @@ LibreOffice Impress のスライドショー下端に進捗バーを表示し、
 | 内容 | 日本語 | English |
 |---|---|---|
 | 導入・利用手順 | [INSTALL_ja.md](docs/INSTALL_ja.md) | [INSTALL_en.md](docs/INSTALL_en.md) |
-| extensions.libreoffice.org での公開手順 | [PUBLISH_ja.md](docs/PUBLISH_ja.md) | [PUBLISH_en.md](docs/PUBLISH_en.md) |
 
 ## フォルダー構成
 
