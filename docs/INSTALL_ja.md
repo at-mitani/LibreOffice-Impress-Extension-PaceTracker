@@ -7,10 +7,10 @@ LibreOffice のインストール先: `C:\Program Files\LibreOffice\program\soff
 
 ## 1. 拡張機能ファイル（.oxt）を用意する
 
-配布用ファイルはビルド済みです。
+配布用ファイルはビルド済みです（`<version>` はバージョン番号です。例: `PresentationPaceTracker-1.0.0.oxt`）。
 
 ```
-dist\PresentationPaceTracker-1.0.0.oxt
+dist\PresentationPaceTracker-<version>.oxt
 ```
 
 ソース（`src\`）を変更した場合は、次のコマンドで作り直します（Python 3 が必要）。
@@ -20,16 +20,18 @@ cd C:\Users\atmit\home\2026\LibreOffice\Impress\Extension
 python tools\build_oxt.py
 ```
 
+バージョン番号はリポジトリ直下の `VERSION` ファイル 1 か所で設定します。ビルドすると、その番号が `src\description.xml` に書き込まれ、.oxt のファイル名にも使われます。
+
 ## 2. Impress に取り込む
 
 ### 方法A: 拡張機能マネージャーを使う（推奨）
 
 1. LibreOffice（Impress）を起動します。
 2. メニュー **ツール > 拡張機能...**（Ctrl+Alt+E）を開きます。
-3. **追加...** をクリックし、`dist\PresentationPaceTracker-1.0.0.oxt` を選びます。
+3. **追加...** をクリックし、`dist\PresentationPaceTracker-<version>.oxt` を選びます。
 4. 「自分だけ」/「このコンピュータのすべてのユーザー」を聞かれたら **自分だけ** を選びます。
 5. ライセンス（Mozilla Public License 2.0）が表示されるので、最後までスクロールして **同意する** をクリックします。
-6. 一覧に「発表ペーストラッカー 1.0.0」が表示されたら **閉じる** をクリックし、表示される案内に従って **LibreOffice を再起動** します。
+6. 一覧に「発表ペーストラッカー <version>」が表示されたら **閉じる** をクリックし、表示される案内に従って **LibreOffice を再起動** します。
 
 > .oxt ファイルをエクスプローラーでダブルクリックしても同じ画面が開きます。
 
@@ -38,7 +40,7 @@ python tools\build_oxt.py
 **LibreOffice をすべて終了してから**（クイック起動も含む）、PowerShell で実行します。
 
 ```powershell
-& "C:\Program Files\LibreOffice\program\unopkg.com" add "C:\Users\atmit\home\2026\LibreOffice\Impress\Extension\dist\PresentationPaceTracker-1.0.0.oxt"
+& "C:\Program Files\LibreOffice\program\unopkg.com" add "C:\Users\atmit\home\2026\LibreOffice\Impress\Extension\dist\PresentationPaceTracker-<version>.oxt"
 & "C:\Program Files\LibreOffice\program\unopkg.com" list
 ```
 

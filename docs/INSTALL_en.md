@@ -6,10 +6,10 @@ Works with LibreOffice 7.4 or later (tested with LibreOffice 26.8.1.1 on Windows
 
 ## 1. Get the extension file (.oxt)
 
-The ready-to-install package is:
+The ready-to-install package is (`<version>` is the version number, for example `PresentationPaceTracker-1.0.0.oxt`):
 
 ```
-dist/PresentationPaceTracker-1.0.0.oxt
+dist/PresentationPaceTracker-<version>.oxt
 ```
 
 If you changed the sources in `src/`, rebuild the package (requires Python 3):
@@ -18,16 +18,18 @@ If you changed the sources in `src/`, rebuild the package (requires Python 3):
 python tools/build_oxt.py
 ```
 
+The version number is set in one place only: the `VERSION` file in the repository root. The build writes it into `src/description.xml` and uses it in the name of the .oxt file.
+
 ## 2. Install it in LibreOffice
 
 ### Option A: Extension Manager (recommended)
 
 1. Start LibreOffice (Impress).
 2. Open **Tools > Extensions...** (Ctrl+Alt+E).
-3. Click **Add...** and select `PresentationPaceTracker-1.0.0.oxt`.
+3. Click **Add...** and select `PresentationPaceTracker-<version>.oxt`.
 4. If asked whether to install for all users or only for you, choose **Only for me**.
 5. The license (Mozilla Public License 2.0) is shown. Scroll to the end and click **Accept**.
-6. When "Presentation Pace Tracker 1.0.0" appears in the list, click **Close** and **restart LibreOffice** when prompted.
+6. When "Presentation Pace Tracker <version>" appears in the list, click **Close** and **restart LibreOffice** when prompted.
 
 > Double-clicking the .oxt file in your file manager opens the same dialog.
 
@@ -38,14 +40,14 @@ python tools/build_oxt.py
 Windows (PowerShell):
 
 ```powershell
-& "C:\Program Files\LibreOffice\program\unopkg.com" add "C:\path\to\PresentationPaceTracker-1.0.0.oxt"
+& "C:\Program Files\LibreOffice\program\unopkg.com" add "C:\path\to\PresentationPaceTracker-<version>.oxt"
 & "C:\Program Files\LibreOffice\program\unopkg.com" list
 ```
 
 Linux / macOS:
 
 ```
-unopkg add /path/to/PresentationPaceTracker-1.0.0.oxt
+unopkg add /path/to/PresentationPaceTracker-<version>.oxt
 unopkg list
 ```
 

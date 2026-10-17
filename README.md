@@ -30,10 +30,11 @@ LibreOffice Impress のスライドショー下端に進捗バーを表示し、
 ## フォルダー構成
 
 ```
+VERSION              バージョン番号（ここだけで設定する）
 src/                 拡張機能の中身（.oxt にそのまま入る）
   pacetracker.py     本体（Python UNO コンポーネント）
   Addons.xcu         メニュー・ツールバー
-  description.xml    ID・バージョンなど
+  description.xml    ID・バージョンなど（バージョンはビルド時に VERSION から書き込まれる）
   icons/             アイコン（.svg は元データで、.oxt には入れない）
 tools/
   build_oxt.py       src/ から dist/*.oxt を作る
@@ -48,6 +49,8 @@ docs/                手順書とスクリーンショット
 ```powershell
 python tools\build_oxt.py
 ```
+
+バージョン番号は `VERSION` ファイル 1 か所で管理します。番号を変えてビルドすると、`src/description.xml` と .oxt のファイル名（`dist/PresentationPaceTracker-<version>.oxt`）に反映されます。
 
 ## ライセンス
 

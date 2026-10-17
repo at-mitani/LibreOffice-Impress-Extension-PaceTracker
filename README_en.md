@@ -31,10 +31,11 @@ A LibreOffice Impress extension that shows a progress band at the bottom of the 
 ## Folder layout
 
 ```
+VERSION              version number (set it here only)
 src/                 contents of the extension (packed into the .oxt as is)
   pacetracker.py     the extension (Python UNO component)
   Addons.xcu         menu and toolbar
-  description.xml    ID, version, etc.
+  description.xml    ID, version, etc. (the version is written from VERSION by the build)
   icons/             icons (.svg files are sources and are not packed)
 tools/
   build_oxt.py       builds dist/*.oxt from src/
@@ -49,6 +50,8 @@ docs/                guides and screenshots
 ```
 python tools/build_oxt.py
 ```
+
+The version number is kept in one place: the `VERSION` file. Change it and build, and it is applied to `src/description.xml` and to the name of the .oxt (`dist/PresentationPaceTracker-<version>.oxt`).
 
 ## License
 

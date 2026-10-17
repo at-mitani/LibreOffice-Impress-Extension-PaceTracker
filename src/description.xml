@@ -9,7 +9,7 @@
              xmlns:l="http://libreoffice.org/extensions/description/2011"
              xmlns:xlink="http://www.w3.org/1999/xlink">
   <identifier value="jp.atmitani.impress.pacetracker"/>
-  <version value="1.0.0"/>
+  <version value="1.0.1"/>
   <platform value="all"/>
 
   <display-name>
