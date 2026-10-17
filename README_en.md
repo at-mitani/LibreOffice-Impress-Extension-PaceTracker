@@ -9,7 +9,7 @@ A LibreOffice Impress extension that shows a progress band at the bottom of the 
 ## Features
 
 1. Set the planned duration (minutes and seconds) in the settings dialog
-2. **Start** in the dialog starts measuring the elapsed time and the slide progress (optionally also starts the slide show)
+2. **Start** in the dialog starts measuring the elapsed time and the slide progress (optionally also starts the slide show). If the title slide is shown before the talk, measurement can start at slide 2 instead
 3. A progress band is shown at the bottom of the slide show
    - Start flag on the left, goal flag on the right
    - The time icon and the slide icon move horizontally from the start to the goal

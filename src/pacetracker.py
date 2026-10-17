@@ -53,6 +53,8 @@ TEXTS = {
         "min": "分",
         "sec": "秒",
         "autostart": "開始時にスライドショーも開始する",
+        "skip_title": "1枚目 (タイトル) を除き、2枚目の表示から計測を開始する",
+        "state_wait": "状態: 2枚目の表示待ち",
         "measure": "計測",
         "elapsed": "経過時間: %s / %s",
         "slide": "スライド: %d / %d",
@@ -99,6 +101,8 @@ TEXTS = {
         "min": "min",
         "sec": "sec",
         "autostart": "Also start the slide show",
+        "skip_title": "Skip the title slide: start measuring at slide 2",
+        "state_wait": "State: waiting for slide 2",
         "measure": "Measurement",
         "elapsed": "Elapsed: %s / %s",
         "slide": "Slide: %d / %d",
@@ -144,6 +148,7 @@ TEXTS = {
 DEFAULT_SETTINGS = {
     "planned_seconds": 20 * 60,
     "autostart_show": True,
+    "skip_title": False,   # measure from slide 2 (the title slide is shown before the talk)
     "time_icon": "",    # empty = default icon (turtle)
     "slide_icon": "",   # empty = default icon (rabbit)
     "start_icon": "",   # empty = default icon (green flag)
@@ -556,6 +561,7 @@ class Tracker(object):
         self.doc = None            # presentation being tracked
         self.edit_frames = []      # frames of self.doc that are not the slide show
         self.started_at = None     # time.monotonic() when measuring started; None = stopped
+        self.waiting = False       # Start was pressed, waiting for slide 2 (skip_title)
         self.overlay = None
         self.last_slide = None
         self.dialog = None
@@ -679,11 +685,19 @@ class Tracker(object):
     def elapsed(self):
         return 0.0 if self.started_at is None else time.monotonic() - self.started_at
 
+    def _first_slide(self):
+        """Index of the slide at which the measurement starts."""
+        return 1 if self.settings["skip_title"] else 0
+
     def start(self):
         self._read_dialog_values()
         self.save_settings()
         if self.started_at is None:
-            self.started_at = time.monotonic()
+            ctrl = self._controller()
+            if self.settings["skip_title"] and (ctrl is None or ctrl.getCurrentSlideIndex() < 1):
+                self.waiting = True  # the clock starts when slide 2 is shown (see tick)
+            else:
+                self.started_at = time.monotonic()
         if self.settings["autostart_show"] and self.doc is not None and self._controller() is None:
             self._remember_edit_frames()
             self.doc.Presentation.start()
@@ -692,6 +706,7 @@ class Tracker(object):
 
     def reset(self):
         self.started_at = None
+        self.waiting = False
         ctrl = self._controller()
         if ctrl is not None:
             try:
@@ -829,16 +844,22 @@ class Tracker(object):
                 self.overlay = Overlay(self, parent, shared=presenter,
                                        background=PRESENTER_BACKGROUND if presenter else self._slide_background(ctrl))
         self._read_dialog_values()
+        index, count = (ctrl.getCurrentSlideIndex(), ctrl.getSlideCount()) if ctrl is not None else (0, 0)
+        first = self._first_slide()
+        if self.waiting and ctrl is not None and index >= first:
+            self.waiting = False
+            self.started_at = time.monotonic()
         elapsed = self.elapsed()
         time_progress = elapsed / self.planned_seconds
-        index, count = (ctrl.getCurrentSlideIndex(), ctrl.getSlideCount()) if ctrl is not None else (0, 0)
         measuring = self.started_at is not None
-        if measuring and count > 1:
-            slide_progress = max(0, index) / float(count - 1)
-        elif measuring and count == 1:
-            slide_progress = 1.0
-        else:
+        # the slide icon moves from the first measured slide to the last slide
+        steps = count - 1 - first
+        if not measuring:
             slide_progress = 0.0
+        elif steps > 0:
+            slide_progress = max(0, index - first) / float(steps)
+        else:
+            slide_progress = 1.0 if index >= first else 0.0
         if self.overlay is not None:
             if index != self.last_slide and self.settings["display_target"] == "slides":
                 self.overlay.set_background(self._slide_background(ctrl))
@@ -846,7 +867,7 @@ class Tracker(object):
             self.overlay.repaint_if_needed()
         self.last_slide = index
         self._update_dialog(elapsed, index, count, ctrl is not None and self.overlay is None)
-        if not measuring and self.dialog is None and self.overlay is None:
+        if not measuring and not self.waiting and self.dialog is None and self.overlay is None:
             self._stop_ticker()
 
     def _drop_overlay(self):
@@ -894,6 +915,7 @@ class Tracker(object):
         if self.doc is None or not doc == self.doc:
             if self.doc is not None and self._controller() is None:
                 self.started_at = None  # switching to another presentation
+                self.waiting = False
             self.doc = doc
             self._remember_edit_frames()
         if self.dialog is not None:
@@ -958,6 +980,7 @@ class Tracker(object):
         seconds = int(self.dialog.getControl("seconds").getModel().Value or 0)
         self.settings["planned_seconds"] = max(1, minutes * 60 + seconds)
         self.settings["autostart_show"] = self.dialog.getControl("autostart").getModel().State == 1
+        self.settings["skip_title"] = self.dialog.getControl("skip_title").getModel().State == 1
         target = "presenter" if self.dialog.getControl("target_presenter").getModel().State == 1 else "slides"
         if target != self.settings["display_target"]:
             # the display area fields show the values of the selected target
@@ -983,16 +1006,19 @@ class Tracker(object):
                 model.Label = text
         label("elapsed", t["elapsed"] % (_fmt(elapsed), _fmt(self.planned_seconds)))
         label("slide", t["slide"] % (index + 1, count) if count else t["slide_none"])
-        if not measuring:
+        if self.waiting:
+            state = t["state_wait"]
+        elif not measuring:
             state = t["state_idle"]
         else:
             state = t["state_over"] if elapsed > self.planned_seconds else t["state_run"]
         if hidden and self.settings["display_target"] == "presenter":
             state += t["no_presenter"]
         label("state", state)
+        running = measuring or self.waiting
         start_model = self.dialog.getControl("start").getModel()
-        if start_model.Enabled == measuring:
-            start_model.Enabled = not measuring
+        if start_model.Enabled == running:
+            start_model.Enabled = not running
 
     def _area_note(self, field):
         """Unit label of a display area field; Y is from the top on the Presenter Console."""
@@ -1005,12 +1031,14 @@ class Tracker(object):
         smgr, ctx = self.smgr, self.ctx
         dm = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)
         dm.Title = t["title"]
-        dm.Width, dm.Height = 252, 314
+        dm.Width, dm.Height = 252, 326
         dm.Closeable = True
         dm.Moveable = True
 
         def add(name, kind, x, y, w, h, **props):
             m = dm.createInstance("com.sun.star.awt.UnoControl%sModel" % kind)
+            if y >= 40:
+                y += 12  # below the skip_title check box
             m.PositionX, m.PositionY, m.Width, m.Height = x, y, w, h
             for k, v in props.items():
                 setattr(m, k, v)
@@ -1027,6 +1055,8 @@ class Tracker(object):
         add("lbl_sec", "FixedText", 179, 10, 20, 10, Label=t["sec"])
         add("autostart", "CheckBox", 8, 26, 236, 10, Label=t["autostart"],
             State=1 if self.settings["autostart_show"] else 0)
+        add("skip_title", "CheckBox", 8, 38, 236, 10, Label=t["skip_title"],
+            State=1 if self.settings["skip_title"] else 0)
 
         add("grp_measure", "GroupBox", 4, 40, 244, 64, Label=t["measure"])
         add("state", "FixedText", 10, 52, 210, 10, Label="")

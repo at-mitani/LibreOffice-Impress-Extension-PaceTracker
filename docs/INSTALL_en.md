@@ -71,6 +71,7 @@ The extension is installed when `list` shows `Identifier: jp.atmitani.impress.pa
    - The elapsed time measurement starts.
    - If **Also start the slide show** is checked, the slide show starts too.
      If it is unchecked, start the slide show yourself (for example with F5).
+   - If **Skip the title slide: start measuring at slide 2** is checked, the measurement does not start while slide 1 is shown (the state line says "waiting for slide 2"). The elapsed time is measured from the moment slide 2 is shown. Use this when the title slide is shown before the talk starts. See "Skip the title slide" below.
 5. A progress band appears at the bottom of the slide show. It has no background: only the flags, the icons and the line in the middle are drawn over the slide.
 
 ![Progress band](images/screenshot_overlay.png)
@@ -87,6 +88,17 @@ If the rabbit is to the right of the turtle, you are on pace to finish on time.
 
 6. **Reset** sets the elapsed time back to 0, stops the measurement and moves both icons back to the start. If the slide show is running, it returns to the first slide. Click **Start** again to measure again.
 7. Closing the dialog with **Close** does not stop the measurement. Open it again to check the state.
+
+### Skip the title slide
+
+If the title slide (slide 1) is shown before the talk starts, check **Skip the title slide: start measuring at slide 2** in the dialog.
+
+- If slide 1 is shown when you click **Start**, the measurement waits for slide 2 and the time icon does not move.
+- The elapsed time is measured from the moment slide 2 is shown.
+- Slide progress runs from slide 2 to the last slide (start at slide 2, goal at the last slide).
+- If slide 2 or a later slide is already shown when you click **Start**, the measurement starts immediately.
+- **Reset** also cancels the waiting state and returns the slide show to slide 1. Click **Start** again to wait for slide 2 again.
+- The setting is saved and used next time.
 
 ### Show the progress only to the presenter (Show on)
 
@@ -162,7 +174,7 @@ Uploaded images and settings are stored in your LibreOffice user profile and are
 | macOS | `~/Library/Application Support/LibreOffice/4/user/pacetracker/` |
 
 ```
-settings.json      planned duration, check box, Show on target, display areas, icons and language
+settings.json      planned duration, check boxes (start slide show, skip title slide), Show on target, display areas, icons and language
 time_icon_*.png    uploaded time icon
 slide_icon_*.png   uploaded slide icon
 start_icon_*.png   uploaded start icon
