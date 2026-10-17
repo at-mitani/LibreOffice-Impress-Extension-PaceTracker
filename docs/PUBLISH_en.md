@@ -34,7 +34,9 @@ This creates `dist/PresentationPaceTracker-<version>.oxt`. Before publishing, ch
 - [ ] Start → the progress band appears at the bottom of the slide show and the turtle and rabbit move
 - [ ] Going back to an earlier slide moves only the rabbit back
 - [ ] Reset moves both icons back to the start
-- [ ] Upload and Default work for both icons
+- [ ] Upload and Default work for all four icons (time, slide, start, goal)
+- [ ] With Show on = Presenter Console only, the band appears only on the Presenter Console and not on the slides (test with two displays)
+- [ ] With a single display and Presenter Console only, the band is not shown anywhere and the state line explains why
 - [ ] Display area changes are applied and kept after Reset
 - [ ] Switching **Language** between Auto, 日本語 and English works and no text is cut off
 - [ ] With **Auto**, the dialog language matches a Japanese and an English LibreOffice user interface
@@ -51,7 +53,7 @@ To test with a clean profile, start LibreOffice with a separate profile folder. 
 | Material | File |
 |---|---|
 | Logo | `src/icons/logo.png` (128×128) |
-| Screenshots | `docs/images/screenshot_overlay.png` (progress band), `docs/images/screenshot_dialog_en.png` (dialog, English), `docs/images/screenshot_dialog.png` (dialog, Japanese) |
+| Screenshots | `docs/images/screenshot_overlay.png` (progress band), `docs/images/screenshot_presenter.png` (on the Presenter Console), `docs/images/screenshot_dialog_en.png` (dialog, English), `docs/images/screenshot_dialog.png` (dialog, Japanese) |
 | Description (English) | Based on `src/description/desc_en.txt` |
 | Description (Japanese) | Based on `src/description/desc_ja.txt` |
 | User guide | `docs/INSTALL_en.md`, `docs/INSTALL_ja.md` (put them on your homepage or repository and link to them) |

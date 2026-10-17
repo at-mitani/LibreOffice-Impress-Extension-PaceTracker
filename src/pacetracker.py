@@ -9,10 +9,13 @@
 # (turtle = time, rabbit = slides by default) that move from a start flag to
 # a goal flag along a band at the bottom of the running slide show.
 #
-# The band is a child window of the slide show frame's container window, so
-# it is drawn inside the full screen show and never steals the keyboard focus.
-# The slide show paints over the band when it changes slides, so the band is
-# repainted after every slide change and periodically.
+# The band has no background of its own. On the slides, the flags, the icons
+# and the pace line are each a small frameless floating window owned by the
+# slide show window: the slide show never paints over such windows, and the
+# slide stays visible between them. On the Presenter Console they share one
+# floating window filled with the console's background color. The background
+# of the icons is set to the color behind them (the slide background, or the
+# background of the Presenter Console).
 #
 import json
 import os
@@ -24,7 +27,9 @@ import traceback
 import uno
 import unohelper
 from com.sun.star.awt import XActionListener, XCallback, XItemListener, XTopWindowListener
+from com.sun.star.awt import Rectangle, WindowDescriptor
 from com.sun.star.awt.PosSize import POS, POSSIZE
+from com.sun.star.awt.WindowClass import TOP
 from com.sun.star.beans import PropertyValue
 from com.sun.star.frame import XTerminateListener
 from com.sun.star.task import XJobExecutor
@@ -33,12 +38,10 @@ EXTENSION_ID = "jp.atmitani.impress.pacetracker"
 IMPL_NAME = EXTENSION_ID + ".PaceTracker"
 
 TICK_SECONDS = 0.25
-REPAINT_TICKS_AFTER_CHANGE = 12   # repaint every tick for 3 s after a slide change
-REPAINT_EVERY_TICKS = 8           # otherwise repaint every 2 s
 
 # Colors of the progress band
-BAND_COLOR = 0xF4F4F4
-BORDER_COLOR = 0xBDBDBD
+WHITE = 0xFFFFFF
+PRESENTER_BACKGROUND = 0x404552  # background of the Presenter Console
 PACE_OK = 0x2E7D32       # slides are ahead of (or level with) the time
 PACE_WARN = 0xEF6C00     # slides are slightly behind the time
 PACE_LATE = 0xC62828     # slides are clearly behind, or time is over
@@ -57,6 +60,10 @@ TEXTS = {
         "state_idle": "状態: 停止中",
         "state_run": "状態: 計測中",
         "state_over": "状態: 計測中 (予定時間を超過)",
+        "no_presenter": " ※発表者コンソールがないため非表示",
+        "target": "表示先:",
+        "target_slides": "スライド (聴衆も見える)",
+        "target_presenter": "発表者コンソールのみ",
         "start": "開始",
         "reset": "リセット",
         "area": "表示領域 (画面に対する %)",
@@ -66,6 +73,7 @@ TEXTS = {
         "area_x_note": "% 左端から",
         "area_y": "Y:",
         "area_y_note": "% 下端から",
+        "area_y_note_top": "% 上端から",
         "area_w": "幅:",
         "area_w_note": "% 横幅比",
         "area_h": "高さ:",
@@ -73,6 +81,8 @@ TEXTS = {
         "icons": "アイコン",
         "time_icon": "時間アイコン:",
         "slide_icon": "スライドアイコン:",
+        "start_icon": "スタートアイコン:",
+        "goal_icon": "ゴールアイコン:",
         "upload": "アップロード...",
         "default": "初期アイコン",
         "close": "閉じる",
@@ -96,6 +106,10 @@ TEXTS = {
         "state_idle": "State: stopped",
         "state_run": "State: measuring",
         "state_over": "State: measuring (over time)",
+        "no_presenter": " - hidden, no Presenter Console",
+        "target": "Show on:",
+        "target_slides": "Slides (audience)",
+        "target_presenter": "Presenter Console only",
         "start": "Start",
         "reset": "Reset",
         "area": "Display area (% of the screen)",
@@ -105,6 +119,7 @@ TEXTS = {
         "area_x_note": "% from left",
         "area_y": "Y:",
         "area_y_note": "% from bottom",
+        "area_y_note_top": "% from top",
         "area_w": "Width:",
         "area_w_note": "% of width",
         "area_h": "Height:",
@@ -112,6 +127,8 @@ TEXTS = {
         "icons": "Icons",
         "time_icon": "Time icon:",
         "slide_icon": "Slide icon:",
+        "start_icon": "Start icon:",
+        "goal_icon": "Goal icon:",
         "upload": "Upload...",
         "default": "Default",
         "close": "Close",
@@ -129,12 +146,23 @@ DEFAULT_SETTINGS = {
     "autostart_show": True,
     "time_icon": "",    # empty = default icon (turtle)
     "slide_icon": "",   # empty = default icon (rabbit)
+    "start_icon": "",   # empty = default icon (green flag)
+    "goal_icon": "",    # empty = default icon (checkered flag)
     "language": "auto",  # language of the dialog: "auto", "ja" or "en"
-    # display area of the band, in % of the slide show window
+    "display_target": "slides",  # where the band is shown: "slides" or "presenter" (Presenter Console)
+    # display area of the band on the slides, in % of the slide show window
     "area_x_pct": 0.0,      # left edge, from the left of the screen
     "area_y_pct": 0.0,      # bottom edge, from the bottom of the screen
     "area_w_pct": 100.0,    # width, relative to the screen width
     "area_h_pct": 8.5,      # height, relative to the screen height
+    # display area on the Presenter Console: at the top, so that the
+    # console's own toolbar at the bottom stays usable. Here Y is the top
+    # edge of the band, measured from the top of the screen.
+    "presenter_area_x_pct": 0.0,
+    "presenter_area_y_pct": 0.0,
+    "presenter_area_w_pct": 100.0,
+    "presenter_area_h_pct": 8.5,
+    "presenter_y_from_top": True,  # marks settings saved with Y from the top on the Presenter Console
 }
 
 # (setting, dialog field, minimum, maximum) of the display area values
@@ -145,6 +173,15 @@ AREA_FIELDS = (
     ("area_h_pct", "area_h", 2.0, 50.0),
 )
 MIN_BAND_PX = 24
+DISPLAY_TARGETS = ("slides", "presenter")
+
+
+def area_key(target, key):
+    """Settings key of a display area value (AREA_FIELDS key) for a display target."""
+    return key if target == "slides" else target + "_" + key
+
+# icons that can be replaced: (kind, default icon file in icons/ without ".png")
+ICONS = (("time", "turtle"), ("slide", "rabbit"), ("start", "start_flag"), ("goal", "goal_flag"))
 
 # entries of the language list box: (setting value, label; None = TEXTS[...]["lang_auto"])
 LANGUAGES = (("auto", None), ("ja", "日本語"), ("en", "English"))
@@ -230,62 +267,106 @@ class _Ticker(threading.Thread):
 # Progress band shown at the bottom of the slide show
 # --------------------------------------------------------------------------
 
+class _Part(object):
+    """One control of the band and the floating window it is shown in."""
+
+    def __init__(self, ctl, window):
+        self.ctl = ctl
+        self.window = window  # None: the control is in the shared band window
+
+
 class Overlay(object):
-    def __init__(self, tracker, frame):
+    """The flags, the moving icons and the pace line.
+
+    There is no visible band: windows drawn over the slide show cannot be
+    really transparent, so the background of the parts is set to the color
+    behind them.
+
+    shared=False (slides): each part is a small floating window owned by the
+    slide show window, so the slide shows between the parts.
+    shared=True (Presenter Console): all parts are in one floating window
+    filled with the console's background color. The console does not repaint
+    the area a moving window leaves, so the icons move inside that window.
+    """
+
+    def __init__(self, tracker, parent, background=WHITE, shared=False):
+        """parent: top window of the slide show or of the Presenter Console."""
         self.tracker = tracker
-        self.frame = frame
-        self.parent = frame.getContainerWindow()
-        smgr = tracker.smgr
-        ctx = tracker.ctx
-
-        model = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlContainerModel", ctx)
-        model.BackgroundColor = BAND_COLOR
-        self.container = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlContainer", ctx)
-        self.container.setModel(model)
-        self.container.createPeer(tracker.toolkit, self.parent)
-
-        self.border = self._add_box("border", BORDER_COLOR)
-        self.track = self._add_box("track", PACE_OK)
-        self.start_img = self._add_image("start", tracker.icon_url("start_flag"))
-        self.goal_img = self._add_image("goal", tracker.icon_url("goal_flag"))
-        self.slide_img = self._add_image("slide", tracker.icon_url("slide"))
-        self.time_img = self._add_image("time", tracker.icon_url("time"))
+        self.parent = parent
+        self.background = background
+        self.band_window = self._new_window() if shared else None
+        self.parts = []
+        self.track = self._add_box(PACE_OK)
+        self.start_img = self._add_image(tracker.icon_url("start"))
+        self.goal_img = self._add_image(tracker.icon_url("goal"))
+        self.slide_img = self._add_image(tracker.icon_url("slide"))
+        self.time_img = self._add_image(tracker.icon_url("time"))
+        self.images = [self.start_img, self.goal_img, self.slide_img, self.time_img]
         self.size = None
         self.last = None
-        self.repaint_ticks = REPAINT_TICKS_AFTER_CHANGE
-        self.tick_count = 0
+        self.moved = False
         self.layout()
-        self.container.setVisible(True)
+        for part in self.parts:
+            part.ctl.setVisible(True)
+        for window in self.windows():
+            window.setVisible(True)
 
-    def _add_box(self, name, color):
-        model = self.tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControlFixedTextModel",
-                                                            self.tracker.ctx)
-        model.BackgroundColor = color
-        model.Label = ""
-        model.Border = 0
-        ctl = self.tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControlFixedText", self.tracker.ctx)
-        ctl.setModel(model)
-        self.container.addControl(name, ctl)
-        return ctl
+    def _new_window(self):
+        desc = WindowDescriptor()
+        desc.Type = TOP
+        desc.WindowServiceName = "floatingwindow"
+        desc.Parent = self.parent
+        desc.Bounds = Rectangle(0, 0, 1, 1)
+        desc.WindowAttributes = 0  # no attributes: no frame around the window
+        window = self.tracker.toolkit.createWindow(desc)
+        window.setBackground(self.background)
+        return window
 
-    def _add_image(self, name, url):
-        model = self.tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControlImageControlModel",
-                                                            self.tracker.ctx)
+    def _create(self, kind, background, **props):
+        tracker = self.tracker
+        window = None if self.band_window is not None else self._new_window()
+        model = tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControl%sModel" % kind, tracker.ctx)
+        model.BackgroundColor = background
         model.Border = 0
-        model.BackgroundColor = BAND_COLOR
-        model.ScaleImage = True
-        model.ScaleMode = 1  # ISOTROPIC: keep the aspect ratio
-        model.Tabstop = False
-        model.ImageURL = url
-        ctl = self.tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControlImageControl",
-                                                          self.tracker.ctx)
+        for k, v in props.items():
+            setattr(model, k, v)
+        ctl = tracker.smgr.createInstanceWithContext("com.sun.star.awt.UnoControl%s" % kind, tracker.ctx)
         ctl.setModel(model)
-        self.container.addControl(name, ctl)
-        return ctl
+        ctl.createPeer(tracker.toolkit, window if window is not None else self.band_window)
+        part = _Part(ctl, window)
+        self.parts.append(part)
+        return part
+
+    def _add_box(self, color):
+        return self._create("FixedText", color, Label="")
+
+    def _add_image(self, url):
+        return self._create("ImageControl", self.background, ScaleImage=True,
+                            ScaleMode=1,  # ISOTROPIC: keep the aspect ratio
+                            Tabstop=False, ImageURL=url)
+
+    def windows(self):
+        if self.band_window is not None:
+            return [self.band_window]
+        return [part.window for part in self.parts]
 
     def set_icon(self, which, url):
-        ctl = self.time_img if which == "time" else self.slide_img
-        ctl.getModel().ImageURL = url
+        part = {"time": self.time_img, "slide": self.slide_img,
+                "start": self.start_img, "goal": self.goal_img}[which]
+        part.ctl.getModel().ImageURL = url
+
+    def set_background(self, color):
+        """Color behind the icons, so that their background does not show."""
+        if color == self.background:
+            return
+        self.background = color
+        for part in self.images:
+            part.ctl.getModel().BackgroundColor = color
+            if part.window is not None:
+                part.window.setBackground(color)
+        if self.band_window is not None:
+            self.band_window.setBackground(color)
+            self.moved = True
 
     def alive(self):
         try:
@@ -297,49 +378,69 @@ class Overlay(object):
     def area(self, screen_w, screen_h):
         """Position and size (x, y, width, height) of the band in pixels."""
         st = self.tracker.settings
-        band = max(MIN_BAND_PX, int(round(screen_h * st["area_h_pct"] / 100.0)))
+        target = st["display_target"]
+
+        def pct(key):
+            return st[area_key(target, key)]
+        band = max(MIN_BAND_PX, int(round(screen_h * pct("area_h_pct") / 100.0)))
         band = min(band, screen_h)
         # the flags and both icons must fit next to each other
-        width = min(screen_w, max(int(round(screen_w * st["area_w_pct"] / 100.0)), 4 * band))
-        x = min(int(round(screen_w * st["area_x_pct"] / 100.0)), screen_w - width)
-        bottom = min(int(round(screen_h * st["area_y_pct"] / 100.0)), screen_h - band)
-        return x, screen_h - bottom - band, width, band
+        width = min(screen_w, max(int(round(screen_w * pct("area_w_pct") / 100.0)), 4 * band))
+        x = min(int(round(screen_w * pct("area_x_pct") / 100.0)), screen_w - width)
+        offset = min(int(round(screen_h * pct("area_y_pct") / 100.0)), screen_h - band)
+        if target == "presenter":
+            return x, offset, width, band              # Y from the top of the screen
+        return x, screen_h - offset - band, width, band  # Y from the bottom of the screen
+
+    def _place(self, part, x, y, w=0, h=0):
+        """Position a part at band coordinates (w, h = 0: keep the size)."""
+        if part.window is None:
+            # in the shared band window
+            if w and h:
+                part.ctl.setPosSize(x, y, w, h, POSSIZE)
+            else:
+                part.ctl.setPosSize(x, y, 0, 0, POS)
+        elif w and h:
+            part.window.setPosSize(self.ox + x, self.oy + y, w, h, POSSIZE)
+            part.ctl.setPosSize(0, 0, w, h, POSSIZE)
+        else:
+            part.window.setPosSize(self.ox + x, self.oy + y, 0, 0, POS)
 
     def layout(self):
+        # floating windows are positioned relative to their parent window
         r = self.parent.getPosSize()
         x, y, W, band = self.area(r.Width, r.Height)
         if self.size == (x, y, W, band):
             return
         self.size = (x, y, W, band)
+        self.ox, self.oy = x, y
+        if self.band_window is not None:
+            self.band_window.setPosSize(x, y, W, band, POSSIZE)
         pad = max(2, band // 30)
-        self.band = band
-        self.container.setPosSize(x, y, W, band, POSSIZE)
-        self.border.setPosSize(0, 0, W, 1, POSSIZE)
-        flag = band - 2 * pad
-        self.start_img.setPosSize(pad, pad, flag, flag, POSSIZE)
-        self.goal_img.setPosSize(W - pad - flag, pad, flag, flag, POSSIZE)
         # two rows: slide icon on top, time icon below, the pace line between them
         line = max(3, band // 24)
         self.icon = (band - 3 * pad - line) // 2
         self.row_top = pad
         self.row_bottom = band - pad - self.icon
+        # the start and goal flags have the same size as the moving icons
+        flag = self.icon
+        flag_y = (band - flag) // 2
+        self._place(self.start_img, pad, flag_y, flag, flag)
+        self._place(self.goal_img, W - pad - flag, flag_y, flag, flag)
         self.x0 = pad + flag + pad
         self.x1 = W - pad - flag - pad - self.icon
-        self.track.setPosSize(self.x0, self.row_top + self.icon + (self.row_bottom - self.row_top - self.icon - line) // 2,
-                              W - 2 * self.x0, line, POSSIZE)
-        self.slide_img.setPosSize(self.x0, self.row_top, self.icon, self.icon, POSSIZE)
-        self.time_img.setPosSize(self.x0, self.row_bottom, self.icon, self.icon, POSSIZE)
+        self._place(self.track, self.x0, self.row_top + self.icon + (self.row_bottom - self.row_top - self.icon - line) // 2,
+                    W - 2 * self.x0, line)
+        self._place(self.slide_img, self.x0, self.row_top, self.icon, self.icon)
+        self._place(self.time_img, self.x0, self.row_bottom, self.icon, self.icon)
         self.last = None
 
-    def slide_changed(self):
-        self.repaint_ticks = REPAINT_TICKS_AFTER_CHANGE
-
     def repaint_if_needed(self):
-        self.tick_count += 1
-        if self.repaint_ticks > 0 or self.tick_count % REPAINT_EVERY_TICKS == 0:
-            self.repaint_ticks = max(0, self.repaint_ticks - 1)
+        # moved icons leave a trail in the shared band window unless it is repainted
+        if self.band_window is not None and self.moved:
+            self.moved = False
             try:
-                self.container.getPeer().invalidate(1 | 8)  # InvalidateStyle CHILDREN | UPDATE
+                self.band_window.invalidate(1 | 8)  # InvalidateStyle CHILDREN | UPDATE
             except Exception:
                 pass
 
@@ -357,20 +458,28 @@ class Overlay(object):
         state = (xs, xt, color)
         if state == self.last:
             return
+        self.moved = True
         if self.last is None or self.last[0] != xs:
-            self.slide_img.setPosSize(xs, self.row_top, 0, 0, POS)
+            self._place(self.slide_img, xs, self.row_top)
         if self.last is None or self.last[1] != xt:
-            self.time_img.setPosSize(xt, self.row_bottom, 0, 0, POS)
+            self._place(self.time_img, xt, self.row_bottom)
         if self.last is None or self.last[2] != color:
-            self.track.getModel().BackgroundColor = color
+            self.track.ctl.getModel().BackgroundColor = color
         self.last = state
 
     def dispose(self):
-        try:
-            self.container.setVisible(False)
-            self.container.dispose()
-        except Exception:
-            pass
+        for part in self.parts:
+            try:
+                part.ctl.setVisible(False)
+                part.ctl.dispose()
+            except Exception:
+                pass
+        for window in self.windows():
+            try:
+                window.setVisible(False)
+                window.dispose()
+            except Exception:
+                pass
 
 
 # --------------------------------------------------------------------------
@@ -478,19 +587,30 @@ class Tracker(object):
         settings = dict(DEFAULT_SETTINGS)
         try:
             with open(self._settings_path(), encoding="utf-8") as f:
-                settings.update(json.load(f))
+                loaded = json.load(f)
+            # Before presenter_y_from_top, the Presenter Console Y was measured
+            # from the bottom like on the slides: convert it to "from the top".
+            if "presenter_area_y_pct" in loaded and not loaded.get("presenter_y_from_top"):
+                loaded["presenter_area_y_pct"] = max(0.0, 100.0 - float(loaded["presenter_area_y_pct"])
+                                                     - float(loaded.get("presenter_area_h_pct", 8.5)))
+            loaded["presenter_y_from_top"] = True
+            settings.update(loaded)
         except Exception:
             pass
-        for key in ("time_icon", "slide_icon"):
+        for key in [kind + "_icon" for kind, _ in ICONS]:
             if settings[key] and not os.path.isfile(settings[key]):
                 settings[key] = ""
+        if settings["display_target"] not in DISPLAY_TARGETS:
+            settings["display_target"] = "slides"
         if settings["language"] not in [value for value, _ in LANGUAGES]:
             settings["language"] = "auto"
-        for key, _, low, high in AREA_FIELDS:
-            try:
-                settings[key] = min(max(float(settings[key]), low), high)
-            except (TypeError, ValueError):
-                settings[key] = DEFAULT_SETTINGS[key]
+        for target in DISPLAY_TARGETS:
+            for base, _, low, high in AREA_FIELDS:
+                key = area_key(target, base)
+                try:
+                    settings[key] = min(max(float(settings[key]), low), high)
+                except (TypeError, ValueError):
+                    settings[key] = DEFAULT_SETTINGS[key]
         return settings
 
     def save_settings(self):
@@ -502,13 +622,11 @@ class Tracker(object):
             _log(traceback.format_exc())
 
     def icon_url(self, which):
-        """which: 'time', 'slide', 'start_flag' or 'goal_flag'."""
-        if which in ("time", "slide"):
-            custom = self.settings[which + "_icon"]
-            if custom:
-                return uno.systemPathToFileUrl(custom)
-            which = "turtle" if which == "time" else "rabbit"
-        return self.ext_url + "/icons/" + which + ".png"
+        """which: 'time', 'slide', 'start' or 'goal'."""
+        custom = self.settings[which + "_icon"]
+        if custom:
+            return uno.systemPathToFileUrl(custom)
+        return self.ext_url + "/icons/" + dict(ICONS)[which] + ".png"
 
     def upload_icon(self, which):
         picker = self.smgr.createInstanceWithContext("com.sun.star.ui.dialogs.FilePicker", self.ctx)
@@ -632,17 +750,84 @@ class Tracker(object):
             return r.Width * r.Height
         return max(candidates, key=area)
 
+    @staticmethod
+    def _slide_background(ctrl):
+        """Background color of the current slide (white if it is not a plain color)."""
+        try:
+            page = ctrl.getCurrentSlide()
+            for p in (page, page.MasterPage):
+                try:
+                    bg = p.Background
+                except Exception:
+                    bg = None
+                if bg is None:
+                    continue
+                style = bg.FillStyle.value
+                if style == "SOLID":
+                    return bg.FillColor
+                if style == "GRADIENT":
+                    # the band is usually at the bottom: use the end color
+                    return bg.FillGradient.EndColor
+                if style != "NONE":
+                    break  # bitmap or hatch: no single color
+        except Exception:
+            pass
+        return WHITE
+
+    def _overlay_parent(self):
+        """The window the band is shown in, or None."""
+        if self.settings["display_target"] == "presenter":
+            return self._presenter_window()
+        frame = self._show_frame()
+        return frame.getContainerWindow() if frame is not None else None
+
+    def _presenter_window(self):
+        """The Presenter Console window of the running slide show, or None.
+
+        The Presenter Console is a top level window that, unlike the slide show
+        and the document windows, does not belong to a frame.
+        """
+        frame_windows = []
+        frames = self.desktop.getFrames()
+        for i in range(frames.getCount()):
+            try:
+                frame_windows.append(frames.getByIndex(i).getContainerWindow())
+            except Exception:
+                pass
+        dialog_peer = self.dialog.getPeer() if self.dialog is not None else None
+        own = self.overlay.windows() if self.overlay is not None else []
+        best, best_area = None, 0
+        for i in range(self.toolkit.getTopWindowCount()):
+            w = self.toolkit.getTopWindow(i)
+            try:
+                if not w.isVisible():
+                    continue
+                r = w.getPosSize()
+                if r.Width < 400 or r.Height < 300:  # message boxes and other small windows
+                    continue
+                if any(w == f for f in frame_windows) or (dialog_peer is not None and w == dialog_peer):
+                    continue
+                if any(w == o for o in own):  # the parts of the band itself
+                    continue
+                if r.Width * r.Height > best_area:
+                    best, best_area = w, r.Width * r.Height
+            except Exception:
+                pass
+        return best
+
     def tick(self):
         ctrl = self._controller()
         if ctrl is None:
             self._remember_edit_frames()
             self._drop_overlay()
         else:
-            frame = self._show_frame()
-            if self.overlay is not None and (not self.overlay.alive() or not self.overlay.frame == frame):
+            parent = self._overlay_parent()
+            if self.overlay is not None and (not self.overlay.alive() or not self.overlay.parent == parent):
                 self._drop_overlay()
-            if self.overlay is None and frame is not None:
-                self.overlay = Overlay(self, frame)
+            if self.overlay is None and parent is not None:
+                presenter = self.settings["display_target"] == "presenter"
+                self.overlay = Overlay(self, parent, shared=presenter,
+                                       background=PRESENTER_BACKGROUND if presenter else self._slide_background(ctrl))
         self._read_dialog_values()
         elapsed = self.elapsed()
         time_progress = elapsed / self.planned_seconds
@@ -655,12 +840,12 @@ class Tracker(object):
         else:
             slide_progress = 0.0
         if self.overlay is not None:
-            if index != self.last_slide:
-                self.overlay.slide_changed()
+            if index != self.last_slide and self.settings["display_target"] == "slides":
+                self.overlay.set_background(self._slide_background(ctrl))
             self.overlay.update(time_progress, slide_progress)
             self.overlay.repaint_if_needed()
         self.last_slide = index
-        self._update_dialog(elapsed, index, count)
+        self._update_dialog(elapsed, index, count, ctrl is not None and self.overlay is None)
         if not measuring and self.dialog is None and self.overlay is None:
             self._stop_ticker()
 
@@ -773,12 +958,20 @@ class Tracker(object):
         seconds = int(self.dialog.getControl("seconds").getModel().Value or 0)
         self.settings["planned_seconds"] = max(1, minutes * 60 + seconds)
         self.settings["autostart_show"] = self.dialog.getControl("autostart").getModel().State == 1
-        for key, field, low, high in AREA_FIELDS:
+        target = "presenter" if self.dialog.getControl("target_presenter").getModel().State == 1 else "slides"
+        if target != self.settings["display_target"]:
+            # the display area fields show the values of the selected target
+            self.settings["display_target"] = target
+            self.dialog.getControl("note_area_y").getModel().Label = self._area_note("area_y")
+            for base, field, _, _ in AREA_FIELDS:
+                self.dialog.getControl(field).getModel().Value = self.settings[area_key(target, base)]
+            return
+        for base, field, low, high in AREA_FIELDS:
             value = self.dialog.getControl(field).getModel().Value
             if value is not None:
-                self.settings[key] = min(max(float(value), low), high)
+                self.settings[area_key(target, base)] = min(max(float(value), low), high)
 
-    def _update_dialog(self, elapsed, index, count):
+    def _update_dialog(self, elapsed, index, count, hidden=False):
         if self.dialog is None:
             return
         t = self.texts
@@ -791,19 +984,28 @@ class Tracker(object):
         label("elapsed", t["elapsed"] % (_fmt(elapsed), _fmt(self.planned_seconds)))
         label("slide", t["slide"] % (index + 1, count) if count else t["slide_none"])
         if not measuring:
-            label("state", t["state_idle"])
+            state = t["state_idle"]
         else:
-            label("state", t["state_over"] if elapsed > self.planned_seconds else t["state_run"])
+            state = t["state_over"] if elapsed > self.planned_seconds else t["state_run"]
+        if hidden and self.settings["display_target"] == "presenter":
+            state += t["no_presenter"]
+        label("state", state)
         start_model = self.dialog.getControl("start").getModel()
         if start_model.Enabled == measuring:
             start_model.Enabled = not measuring
+
+    def _area_note(self, field):
+        """Unit label of a display area field; Y is from the top on the Presenter Console."""
+        if field == "area_y" and self.settings["display_target"] == "presenter":
+            return self.texts["area_y_note_top"]
+        return self.texts[field + "_note"]
 
     def _build_dialog(self):
         t = self.texts
         smgr, ctx = self.smgr, self.ctx
         dm = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)
         dm.Title = t["title"]
-        dm.Width, dm.Height = 252, 246
+        dm.Width, dm.Height = 252, 314
         dm.Closeable = True
         dm.Moveable = True
 
@@ -833,40 +1035,50 @@ class Tracker(object):
         add("start", "Button", 10, 86, 60, 14, Label=t["start"], DefaultButton=True)
         add("reset", "Button", 76, 86, 60, 14, Label=t["reset"])
 
-        add("grp_area", "GroupBox", 4, 108, 244, 46, Label=t["area"])
-        add("lbl_area_pos", "FixedText", 10, 122, 34, 10, Label=t["area_pos"])
-        add("lbl_area_size", "FixedText", 10, 138, 34, 10, Label=t["area_size"])
-        for i, (key, field, low, high) in enumerate(AREA_FIELDS):
+        add("grp_area", "GroupBox", 4, 108, 244, 62, Label=t["area"])
+        presenter = self.settings["display_target"] == "presenter"
+        add("lbl_target", "FixedText", 10, 122, 34, 10, Label=t["target"])
+        add("target_slides", "RadioButton", 46, 121, 92, 11, Label=t["target_slides"],
+            State=0 if presenter else 1)
+        add("target_presenter", "RadioButton", 142, 121, 104, 11, Label=t["target_presenter"],
+            State=1 if presenter else 0)
+        add("lbl_area_pos", "FixedText", 10, 138, 34, 10, Label=t["area_pos"])
+        add("lbl_area_size", "FixedText", 10, 154, 34, 10, Label=t["area_size"])
+        for i, (base, field, low, high) in enumerate(AREA_FIELDS):
+            key = area_key(self.settings["display_target"], base)
             # X, Y on the first row, width, height on the second row
             x = 46 if i % 2 == 0 else 142
-            y = 120 + (i // 2) * 16
+            y = 136 + (i // 2) * 16
             add("lbl_" + field, "FixedText", x, y + 2, 28, 10, Label=t[field])
             add(field, "NumericField", x + 29, y, 30, 13, Value=self.settings[key], ValueMin=low, ValueMax=high,
                 DecimalAccuracy=1, Spin=True, ValueStep=0.5, StrictFormat=True)
             add("note_" + field, "FixedText", x + 61, y + 2, 33 if i % 2 == 0 else 44, 10,
-                Label=t[field + "_note"])
+                Label=self._area_note(field))
 
-        add("grp_icons", "GroupBox", 4, 158, 244, 66, Label=t["icons"])
-        for i, which in enumerate(("time", "slide")):
-            y = 170 + i * 26
+        add("grp_icons", "GroupBox", 4, 174, 244, 118, Label=t["icons"])
+        for i, (which, _) in enumerate(ICONS):
+            y = 186 + i * 26
             add("lbl_" + which, "FixedText", 10, y + 6, 60, 10, Label=t[which + "_icon"])
             add(which + "_preview", "ImageControl", 72, y, 22, 22, ImageURL=self.icon_url(which),
                 ScaleImage=True, ScaleMode=1, Border=1)
             add("upload_" + which, "Button", 104, y + 4, 76, 14, Label=t["upload"])
             add("default_" + which, "Button", 186, y + 4, 56, 14, Label=t["default"])
 
-        add("lbl_language", "FixedText", 8, 230, 34, 10, Label=t["language"])
+        add("lbl_language", "FixedText", 8, 298, 34, 10, Label=t["language"])
         languages = tuple(label or t["lang_auto"] for _, label in LANGUAGES)
         current = [value for value, _ in LANGUAGES].index(self.settings["language"])
-        lb = add("language", "ListBox", 44, 228, 130, 14, Dropdown=True, StringItemList=languages,
+        lb = add("language", "ListBox", 44, 296, 130, 14, Dropdown=True, StringItemList=languages,
                  LineCount=len(languages))
         uno.invoke(lb, "setPropertyValue", ("SelectedItems", uno.Any("[]short", (current,))))
-        add("close", "Button", 186, 228, 60, 14, Label=t["close"])
+        add("close", "Button", 186, 296, 60, 14, Label=t["close"])
 
         dialog = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)
         dialog.setModel(dm)
         listener = _DialogListener(self)
-        for name in ("start", "reset", "close", "upload_time", "default_time", "upload_slide", "default_slide"):
+        commands = ["start", "reset", "close"]
+        for which, _ in ICONS:
+            commands += ["upload_" + which, "default_" + which]
+        for name in commands:
             ctl = dialog.getControl(name)
             ctl.setActionCommand(name)
             ctl.addActionListener(listener)

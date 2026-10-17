@@ -71,14 +71,14 @@ The extension is installed when `list` shows `Identifier: jp.atmitani.impress.pa
    - The elapsed time measurement starts.
    - If **Also start the slide show** is checked, the slide show starts too.
      If it is unchecked, start the slide show yourself (for example with F5).
-5. A progress band appears at the bottom of the slide show.
+5. A progress band appears at the bottom of the slide show. It has no background: only the flags, the icons and the line in the middle are drawn over the slide.
 
 ![Progress band](images/screenshot_overlay.png)
 
 | Element | Meaning |
 |---|---|
-| Green flag on the left | Start |
-| Checkered flag on the right | Goal |
+| Icon on the left (default: green flag) | Start |
+| Icon on the right (default: checkered flag) | Goal |
 | Upper icon (default: rabbit) | Slide progress. At the start on the first slide, at the goal on the last slide. Moves back to the left when you go back to an earlier slide |
 | Lower icon (default: turtle) | Elapsed time. Reaches the goal at the planned duration. Keeps moving forward even when you go back to an earlier slide |
 | Color of the line in the middle | Green: on time or ahead / Orange: slightly behind / Red: behind (or out of time) |
@@ -88,17 +88,35 @@ If the rabbit is to the right of the turtle, you are on pace to finish on time.
 6. **Reset** sets the elapsed time back to 0, stops the measurement and moves both icons back to the start. If the slide show is running, it returns to the first slide. Click **Start** again to measure again.
 7. Closing the dialog with **Close** does not stop the measurement. Open it again to check the state.
 
+### Show the progress only to the presenter (Show on)
+
+Use **Show on** in the **Display area** section of the dialog to choose where the band is shown.
+
+| Show on | Screen |
+|---|---|
+| Slides (audience) | The slide show screen (default). The audience sees it too |
+| Presenter Console only | Only the Presenter Console (the presenter's screen). It is not shown on the slides the audience sees |
+
+![Progress band on the Presenter Console](images/screenshot_presenter.png)
+
+- The Presenter Console appears on the presenter's screen when you start a slide show with two displays connected. **Tools > Options > LibreOffice Impress > General > Enable Presenter Console** must be checked.
+- If **Presenter Console only** is selected and no Presenter Console is shown (for example with a single display), the band is not shown anywhere. The state line of the dialog then says "hidden, no Presenter Console".
+- Changes are applied immediately, even while the slide show is running. The selection is saved.
+
 ### Change the position and size of the progress band
 
-Use the **Display area** section of the dialog. All values are percentages of the slide show screen.
+Use the **Display area** section of the dialog. All values are percentages of the screen the band is shown on.
+Position and size are saved **separately for each Show on target**. When you switch the target, the fields switch to that target's values.
 
-| Field | Meaning | Default | Allowed range |
-|---|---|---|---|
-| Position X | Left edge of the band, measured from the **left** edge of the screen | 0 % | 0–95 % |
-| Position Y | Bottom edge of the band, measured from the **bottom** edge of the screen | 0 % | 0–95 % |
-| Width | Width of the band, relative to the screen width | 100 % | 5–100 % |
-| Height | Height of the band, relative to the screen height | 8.5 % | 2–50 % |
+| Field | Meaning | Default (slides) | Default (Presenter Console) | Allowed range |
+|---|---|---|---|---|
+| Position X | Left edge of the band, measured from the **left** edge of the screen | 0 % | 0 % | 0–95 % |
+| Position Y | Slides: bottom edge of the band, measured from the **bottom** edge of the screen<br>Presenter Console: top edge of the band, measured from the **top** edge of the screen | 0 % (from bottom) | 0 % (from top) | 0–95 % |
+| Width | Width of the band, relative to the screen width | 100 % | 100 % | 5–100 % |
+| Height | Height of the band, relative to the screen height | 8.5 % | 8.5 % | 2–50 % |
 
+- On the Presenter Console the band is shown at the top by default, so that it does not cover the console's own buttons (Previous, Next, Pause, ...) at the bottom.
+- **The reference edge of Position Y depends on the target:** from the bottom on the slides, from the top on the Presenter Console. The label next to the Y field ("% from bottom" / "% from top") switches accordingly. In both cases you enter the distance from that edge as is; for example Y = 5 places the band 5 % above the bottom on the slides and 5 % below the top on the Presenter Console.
 - Changes are applied immediately, even while the slide show is running.
 - The values are saved automatically. They are kept after **Reset** and after restarting LibreOffice.
 - If the band would extend beyond the screen, it is moved back onto the screen.
@@ -122,10 +140,18 @@ Choose it with **Language** at the bottom left of the dialog.
 
 ### Change the icons
 
-In the **Icons** section, for both the time icon and the slide icon:
+In the **Icons** section you can replace each of the four icons.
+
+| Icon | Default | Where it is shown |
+|---|---|---|
+| Time icon | Turtle | Moves along the lower row |
+| Slide icon | Rabbit | Moves along the upper row |
+| Start icon | Green flag | Left end |
+| Goal icon | Checkered flag | Right end |
 
 - **Upload...**: select a PNG / SVG / JPEG / GIF / BMP / WebP image to replace the icon (a square PNG with a transparent background looks best).
-- **Default**: go back to the turtle (time) or the rabbit (slide).
+- **Default**: go back to the default icon in the table above.
+- All four icons are shown at the same size (derived from the height of the band).
 
 Uploaded images and settings are stored in your LibreOffice user profile and are used again next time:
 
@@ -136,17 +162,22 @@ Uploaded images and settings are stored in your LibreOffice user profile and are
 | macOS | `~/Library/Application Support/LibreOffice/4/user/pacetracker/` |
 
 ```
-settings.json      planned duration, check box, display area, icons and language
+settings.json      planned duration, check box, Show on target, display areas, icons and language
 time_icon_*.png    uploaded time icon
 slide_icon_*.png   uploaded slide icon
+start_icon_*.png   uploaded start icon
+goal_icon_*.png    uploaded goal icon
 pacetracker.log    log written when an error occurs
 ```
 
 ## 4. Notes and troubleshooting
 
 - **The progress band is shown in full screen slide shows.** It may not appear if the slide show is set to run in a window (**Slide Show > Slide Show Settings**).
-- The band is drawn on top of the slide (by default at the bottom of the screen, 8.5 % high). If it covers slide content, change its position or size under **Display area**.
-- Right after a slide change the band is redrawn after the slide show has repainted the screen, so it may disappear for a moment.
+- The band is drawn on top of the slide (by default at the bottom of the screen, 8.5 % high). If the flags or icons cover slide content, change the position or size under **Display area**.
+- The band is made to look transparent. LibreOffice cannot draw really transparent windows over a slide show, so the square around each icon is filled with the **slide background color** (on the Presenter Console: the console's background color).
+  - With a plain color slide background, nothing shows around the icons.
+  - With a gradient background the end color is used, and with a picture or pattern background white is used, so a square may be visible around the icons.
+  - Slide text or shapes right behind an icon are hidden by the icon's square (not between the icons).
 - Slide progress is based on the slides shown in the slide show (hidden slides are not counted).
 - The menu entry is missing: make sure LibreOffice was fully restarted after the installation (including the Quickstarter).
 - The dialog does not open: at least one Impress presentation must be open.

@@ -35,7 +35,9 @@ python tools\build_oxt.py
 - [ ] 開始 → スライドショー下端に進捗バーが出て、カメとウサギが動く
 - [ ] スライドを戻すとウサギだけが左に戻る
 - [ ] リセットで両方がスタートに戻る
-- [ ] アイコンのアップロードと「初期アイコン」が効く
+- [ ] 4 つのアイコン（時間・スライド・スタート・ゴール）すべてでアップロードと「初期アイコン」が効く
+- [ ] 表示先「発表者コンソールのみ」で、進捗バーが発表者コンソールだけに出てスライドには出ない（ディスプレイ 2 台で確認）
+- [ ] ディスプレイ 1 台で「発表者コンソールのみ」にすると、どこにも表示されず、状態欄に非表示の理由が出る
 - [ ] 管理画面の **言語** で「日本語」「English」「自動」を切り替えて、どれも表示が崩れない
 - [ ] LibreOffice 本体の表示言語が日本語・英語のどちらでも、「自動」で正しい言語になる
 - [ ] できれば Linux / macOS でも確認する（`platform` は `all` で登録しているため）
@@ -51,7 +53,7 @@ python tools\build_oxt.py
 | 素材 | ファイル |
 |---|---|
 | ロゴ | `src/icons/logo.png`（128×128） |
-| スクリーンショット | `docs/images/screenshot_overlay.png`（進捗バー）、`docs/images/screenshot_dialog_en.png`（管理画面・英語。英語ページ用）、`docs/images/screenshot_dialog.png`（管理画面・日本語） |
+| スクリーンショット | `docs/images/screenshot_overlay.png`（進捗バー）、`docs/images/screenshot_presenter.png`（発表者コンソールに表示）、`docs/images/screenshot_dialog_en.png`（管理画面・英語。英語ページ用）、`docs/images/screenshot_dialog.png`（管理画面・日本語） |
 | 利用手順 | `docs/INSTALL_en.md`（英語）、`docs/INSTALL_ja.md`（日本語）。ホームページやリポジトリに置いてリンクできます |
 | 説明文（英語） | `src/description/desc_en.txt` をもとに書く |
 | 説明文（日本語） | `src/description/desc_ja.txt` をもとに書く |

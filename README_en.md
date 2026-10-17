@@ -16,8 +16,9 @@ A LibreOffice Impress extension that shows a progress band at the bottom of the 
    - Going back to an earlier slide moves the slide icon back to the left; the time icon keeps moving forward
    - The color of the line shows the pace (green = on time, orange = slightly behind, red = behind)
    - The display area (position X/Y, width, height) can be set in % of the screen. The values are saved and kept after Reset
+   - Show on: "Slides (audience)" or "Presenter Console only", to keep the progress hidden from the audience
 4. **Reset** in the dialog resets the elapsed time and the slide progress
-5. The time and slide icons can be replaced by uploading images in the dialog (defaults: turtle = time, rabbit = slides)
+5. All four icons (time, slide, start, goal) can be replaced by uploading images in the dialog (defaults: turtle = time, rabbit = slides, green flag = start, checkered flag = goal). All four are shown at the same size
 6. The dialog language can be switched between Auto / 日本語 (Japanese) / English (the choice is saved)
 
 ## Documentation
